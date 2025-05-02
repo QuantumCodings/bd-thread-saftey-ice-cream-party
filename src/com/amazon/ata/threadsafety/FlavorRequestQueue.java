@@ -7,31 +7,37 @@ import java.util.Queue;
 
 public class FlavorRequestQueue {
     private final Queue<Flavor> flavorQueue;
+    private final Object lock = new Object();
 
     public FlavorRequestQueue() {
         flavorQueue = new LinkedList<>();
     }
 
     public void needFlavor(Flavor flavor) {
-        flavorQueue.add(flavor);
+        synchronized (lock) {
+            flavorQueue.add(flavor);
+            lock.notify(); // Notify one waiting thread that a flavor has been added
+        }
     }
 
     public Flavor nextNeededFlavor() {
-        Flavor flavor = flavorQueue.poll();
-        while (flavor == null) {
-            try {
-                Thread.sleep(10L);
-                flavor = flavorQueue.poll();
-            } catch (InterruptedException e) {
-                System.out.println("!!!Interrupted waiting for flavor request!!!");
-                e.printStackTrace();
-                throw new RuntimeException("Interrupted waiting for flavor request!", e);
+        synchronized (lock) {
+            while (flavorQueue.isEmpty()) {
+                try {
+                    lock.wait();
+                } catch (InterruptedException e) {
+                    System.out.println("!!!Interrupted waiting for flavor request!!!");
+                    e.printStackTrace();
+                    throw new RuntimeException("Interrupted waiting for flavor request!", e);
+                }
             }
+            return flavorQueue.poll();
         }
-        return flavor;
     }
 
     public int requestCount() {
-        return flavorQueue.size();
+        synchronized (lock) {
+            return flavorQueue.size();
+        }
     }
 }
